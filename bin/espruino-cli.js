@@ -119,6 +119,9 @@ for (var i=2;i<process.argv.length;i++) {
    } else if (arg=="--download") {
      i++; args.fileToDownload = next;
      if (!isNextValid(next)) throw new Error("Expecting a file name argument to --download");
+   } else if (arg=="--upload") {
+     i++; args.fileToUpload = next;
+     if (!isNextValid(next)) throw new Error("Expecting a file name argument to --upload");
    } else if (arg=="--config") {
      i++;
      if (!next || next.indexOf("=")==-1) throw new Error("Expecting a key=value argument to --config");
@@ -501,6 +504,21 @@ function downloadFile(callback) {
   });
 }
 
+/* Upload a file to Espruino */
+function uploadFile(callback) {
+  Espruino.Core.Utils.uploadFile(args.fileToUpload, "hello world", function(contents) {
+    //if (contents===undefined) {
+    //  log("Timed out receiving file")
+    //  if (!args.file && !args.updateFirmware && !args.expr) return process.exit(0);
+    //  if (callback) return callback();
+    //}
+
+    log(`"${args.fileToUpload}" successfully uploaded.`);
+    if (!args.file && !args.updateFirmware && !args.expr) return process.exit(0);
+    if (callback) return callback();
+  });
+}
+
 /* Connect and send file/expression/etc */
 function connect(devicePath, exitCallback) {
   if (args.ideServer) log("WARNING: --ide specified, but no terminal. Don't specify a file/expression to upload.");
@@ -543,6 +561,15 @@ function connect(devicePath, exitCallback) {
           // figure out what code we need to send (if any) and download the file
           sendCode(function() {
             downloadFile(function() {
+              exitTimeout = setTimeout(exitCallback, 500);
+            });
+          });
+        }
+
+        //Is there a file we should upload?
+        if (args.fileToUpload) {
+          sendCode(function() {
+            uploadFile(function() {
               exitTimeout = setTimeout(exitCallback, 500);
             });
           });
@@ -707,10 +734,20 @@ function terminal(devicePath, exitCallback) {
         Espruino.Core.Serial.write(data);
       });
 
+    // Is there a file we should download?
     if (args.fileToDownload) {
       // figure out what code we need to send (if any) and download the file
       sendCode(function() {
         downloadFile(function() {
+          if (args.watchFile) sendOnFileChanged();
+        });
+      });
+    }
+
+    // Is there a file we should upload?
+    if (args.fileToUpload) {
+      sendCode(function() {
+        uploadFile(function() {
           if (args.watchFile) sendOnFileChanged();
         });
       });
